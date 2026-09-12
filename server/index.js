@@ -9,7 +9,19 @@ require('dotenv').config();
 
 
 const app = express();
-app.use(cors());
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3001,http://127.0.0.1:3001').split(',').map(origin => origin.trim());
+
+app.use(cors({
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+            return;
+        }
+
+        callback(new Error('Not allowed by CORS'));
+    }
+}));
+
 const upload = multer({ dest: 'uploads/' });
 
 const ai = new GoogleGenAI({
