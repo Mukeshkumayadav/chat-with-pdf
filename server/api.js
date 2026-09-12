@@ -1,28 +1,13 @@
-const express = require('express')
-const cors = require('cors');
+const express = require('express');
 const multer = require('multer');
 const pdfParse = require('pdf-parse');
 const fs = require('fs');
+const path = require('path');
 const { GoogleGenAI } = require('@google/genai');
 const { QdrantClient } = require('@qdrant/js-client-rest');
-require('dotenv').config();
 
-
-const app = express();
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3001,http://127.0.0.1:3001').split(',').map(origin => origin.trim());
-
-app.use(cors({
-    origin: (origin, callback) => {
-        if (!origin || allowedOrigins.includes(origin)) {
-            callback(null, true);
-            return;
-        }
-
-        callback(new Error('Not allowed by CORS'));
-    }
-}));
-
-const upload = multer({ dest: 'uploads/' });
+const router = express.Router();
+const upload = multer({ dest: path.join(__dirname, 'uploads/') });
 
 const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY
@@ -35,33 +20,14 @@ async function createEmbedding(text) {
     });
 
     return response.embeddings[0].values;
-
-};
+}
 
 const qdrant = new QdrantClient({
     url: process.env.QDRANT_URL,
     apiKey: process.env.QDRANT_API_KEY
 });
 
-
-function cosineSimilarity(vecA, vecB) {
-    let dotProduct = 0;
-    let magA = 0;
-    let magB = 0;
-    for (let i = 0; i < vecA.length; i++) {
-        dotProduct += vecA[i] * vecB[i];
-        magA += vecA[i] * vecA[i];
-        magB += vecB[i] * vecB[i];
-    }
-
-    return dotProduct / (Math.sqrt(magA) * Math.sqrt(magB));
-}
-
-app.get('/', (req, res) => {
-    res.send('Hello, Mukesh!');
-})
-
-app.get('/create-collection', async (req, res) => {
+router.get('/create-collection', async (req, res) => {
     try {
         await qdrant.createCollection('pdf-doc', {
             vectors: {
@@ -74,12 +40,9 @@ app.get('/create-collection', async (req, res) => {
         console.log(err);
         res.status(500).send(err);
     }
-
 });
 
-app.post('/upload', upload.single('pdf'), async (req, res) => {
-    console.log(req.body); // Log the uploaded file information
-
+router.post('/upload', upload.single('pdf'), async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).send('No PDF file uploaded');
@@ -95,8 +58,6 @@ app.post('/upload', upload.single('pdf'), async (req, res) => {
 
         const chunks = text.split('\n\n').filter(chunk => chunk.trim() != '');
 
-
-
         const chunkEmbeddings = [];
         for (const chunk of chunks) {
             const embedding = await createEmbedding(chunk);
@@ -106,7 +67,6 @@ app.post('/upload', upload.single('pdf'), async (req, res) => {
                 embedding
             });
         }
-
 
         const points = chunkEmbeddings.map((item, index) => ({
             id: index + 1,
@@ -123,13 +83,11 @@ app.post('/upload', upload.single('pdf'), async (req, res) => {
         const question = req.body.question;
         const questionEmbedding = await createEmbedding(question);
 
-
         const searchResult = await qdrant.query('pdf-doc', {
             query: questionEmbedding,
             limit: 1,
             with_payload: true
         });
-
 
         const bestChunk = searchResult.points[0]?.payload?.text ?? '';
 
@@ -139,9 +97,6 @@ app.post('/upload', upload.single('pdf'), async (req, res) => {
         });
 
         res.send(response.text);
-
-
-
     } catch (err) {
         console.log(err);
         res.status(500).send(err);
@@ -150,14 +105,6 @@ app.post('/upload', upload.single('pdf'), async (req, res) => {
             fs.unlink(req.file.path, () => { });
         }
     }
-
-
-
 });
 
-
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-});
+module.exports = router;

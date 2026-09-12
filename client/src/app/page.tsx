@@ -2,8 +2,6 @@
 
 import { ChangeEvent, FormEvent, useState } from "react";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
-
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
   const [question, setQuestion] = useState("");
@@ -39,7 +37,7 @@ export default function Home() {
     formData.append("question", question.trim());
 
     try {
-      const response = await fetch(`${API_BASE_URL}/upload`, {
+      const response = await fetch(`/api/upload`, {
         method: "POST",
         body: formData,
       });
