@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const { GoogleGenAI } = require('@google/genai');
 const { QdrantClient } = require('@qdrant/js-client-rest');
+const { splitPdfTextIntoChunks } = require('./textUtils');
 
 const router = express.Router();
 const upload = multer({ dest: path.join(__dirname, 'uploads/') });
@@ -29,12 +30,25 @@ const qdrant = new QdrantClient({
 
 router.get('/create-collection', async (req, res) => {
     try {
+        try {
+            await qdrant.getCollection('pdf-doc');
+            return res.send('Collection already exists');
+        } catch (getCollectionError) {
+            const statusCode = getCollectionError?.status || getCollectionError?.response?.status;
+            const message = String(getCollectionError?.message || '');
+
+            if (statusCode !== 404 && !message.toLowerCase().includes('not found')) {
+                throw getCollectionError;
+            }
+        }
+
         await qdrant.createCollection('pdf-doc', {
             vectors: {
                 size: 3072,
                 distance: 'Cosine'
             }
         });
+
         res.send('Collection created successfully');
     } catch (err) {
         console.log(err);
@@ -54,19 +68,20 @@ router.post('/upload', upload.single('pdf'), async (req, res) => {
         const dataBuffer = fs.readFileSync(req.file.path);
 
         const pdfData = await pdfParse(dataBuffer);
-        const text = pdfData.text;
+        const text = pdfData.text || '';
 
-        const chunks = text.split('\n\n').filter(chunk => chunk.trim() != '');
+        const chunks = splitPdfTextIntoChunks(text, 1200, 8);
 
-        const chunkEmbeddings = [];
-        for (const chunk of chunks) {
-            const embedding = await createEmbedding(chunk);
-
-            chunkEmbeddings.push({
-                text: chunk,
-                embedding
-            });
+        if (chunks.length === 0) {
+            return res.status(400).send('No readable text found in the uploaded PDF. Please upload a PDF with selectable text or a different file.');
         }
+
+        const chunkEmbeddings = await Promise.all(
+            chunks.map(async (chunk) => ({
+                text: chunk,
+                embedding: await createEmbedding(chunk)
+            }))
+        );
 
         const points = chunkEmbeddings.map((item, index) => ({
             id: index + 1,
@@ -88,6 +103,10 @@ router.post('/upload', upload.single('pdf'), async (req, res) => {
             limit: 1,
             with_payload: true
         });
+
+        if (!searchResult.points || searchResult.points.length === 0) {
+            return res.status(400).send('No relevant content was found in the PDF for that question.');
+        }
 
         const bestChunk = searchResult.points[0]?.payload?.text ?? '';
 
