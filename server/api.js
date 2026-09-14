@@ -77,6 +77,13 @@ router.post('/upload', upload.single('pdf'), async (req, res) => {
         if (!req.file) {
             return res.status(400).send('No PDF file uploaded');
         }
+
+        const originalName = String(req.file.originalname || '');
+        const isPdf = req.file.mimetype === 'application/pdf' || originalName.toLowerCase().endsWith('.pdf');
+        if (!isPdf) {
+            return res.status(400).send('Only PDF files are allowed.');
+        }
+
         if (!req.body.question) {
             return res.status(400).send('No question provided');
         }

@@ -11,6 +11,14 @@ export default function Home() {
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0] ?? null;
+
+    if (selectedFile && selectedFile.type !== "application/pdf" && !selectedFile.name.toLowerCase().endsWith(".pdf")) {
+      setFile(null);
+      setError("Only PDF files are allowed.");
+      event.target.value = "";
+      return;
+    }
+
     setFile(selectedFile);
     if (error) setError("");
   };
@@ -20,6 +28,12 @@ export default function Home() {
 
     if (!file) {
       setError("Please choose a PDF file first.");
+      return;
+    }
+
+    const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+    if (!isPdf) {
+      setError("Only PDF files are allowed.");
       return;
     }
 
