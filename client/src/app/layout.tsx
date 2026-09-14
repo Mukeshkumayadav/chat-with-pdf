@@ -13,8 +13,45 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PDF AI Assistant",
-  description: "Upload a PDF and ask questions based on its content.",
+  metadataBase: new URL("https://chat-with-pdf-wpyf.onrender.com"),
+  title: {
+    default: "PDF AI Assistant | Ask Questions from Your PDFs",
+    template: "%s | PDF AI Assistant",
+  },
+  description:
+    "Upload a PDF and ask questions about its content using AI. Get fast, relevant answers from your documents without reading every page manually.",
+  keywords: [
+    "PDF AI assistant",
+    "ask questions from PDF",
+    "AI PDF chatbot",
+    "document Q&A",
+    "upload PDF and ask",
+    "PDF reader with AI",
+    "chat with PDF",
+  ],
+  applicationName: "PDF AI Assistant",
+  authors: [{ name: "PDF AI Assistant" }],
+  openGraph: {
+    title: "PDF AI Assistant | Ask Questions from Your PDFs",
+    description:
+      "Upload a PDF and ask questions about its content using AI. Get instant answers grounded in your document.",
+    url: "https://chat-with-pdf-wpyf.onrender.com",
+    siteName: "PDF AI Assistant",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "PDF AI Assistant",
+    description:
+      "Upload a PDF and ask questions about its content using AI. Get instant answers from your documents.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
