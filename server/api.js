@@ -10,9 +10,23 @@ const { splitPdfTextIntoChunks } = require('./textUtils');
 const router = express.Router();
 const upload = multer({ dest: path.join(__dirname, 'uploads/') });
 
+const requiredEnv = ['GEMINI_API_KEY', 'QDRANT_URL', 'QDRANT_API_KEY'];
+const missingEnv = requiredEnv.filter((key) => !process.env[key]);
+
+if (missingEnv.length > 0) {
+    console.warn(`Missing required environment variables: ${missingEnv.join(', ')}`);
+}
+
 const ai = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY
 });
+
+function assertServerConfig() {
+    const missing = requiredEnv.filter((key) => !process.env[key]);
+    if (missing.length > 0) {
+        throw new Error(`Missing server configuration: ${missing.join(', ')}`);
+    }
+}
 
 async function createEmbedding(text) {
     const response = await ai.models.embedContent({
@@ -58,6 +72,8 @@ router.get('/create-collection', async (req, res) => {
 
 router.post('/upload', upload.single('pdf'), async (req, res) => {
     try {
+        assertServerConfig();
+
         if (!req.file) {
             return res.status(400).send('No PDF file uploaded');
         }
@@ -118,7 +134,8 @@ router.post('/upload', upload.single('pdf'), async (req, res) => {
         res.send(response.text);
     } catch (err) {
         console.log(err);
-        res.status(500).send(err);
+        const message = err?.message || 'Something went wrong while processing the PDF.';
+        res.status(500).send(message);
     } finally {
         if (req.file) {
             fs.unlink(req.file.path, () => { });
